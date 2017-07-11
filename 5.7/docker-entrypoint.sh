@@ -60,9 +60,7 @@ _datadir() {
 
 # allow the container to be started with `--user`
 if [ "$1" = 'mysqld' -a -z "$wantHelp" -a "$(id -u)" = '0' ]; then
-	ls -al /var/lib/mysql/
 	_check_config "$@"
-	ls -al /var/lib/mysql/
 	DATADIR="$(_datadir "$@")"
 	mkdir -p "$DATADIR"
 	chown -R mysql:mysql "$DATADIR"
