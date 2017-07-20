@@ -6,6 +6,7 @@ if [ "${1:0:1}" = '-' ]; then
 	set -- mysqld "$@"
 fi
 
+# if command is not mysqld then exec & exit
 if [ "$1" != 'mysqld' ]; then
 	exec "$@"
 	exit $?
@@ -20,8 +21,7 @@ DATADIR="$($@ --verbose --wsrep_on=OFF --help 2>/dev/null | awk '$1 == "datadir"
 
 _initialize_database() {
 	if [ -z "$MYSQL_ROOT_PASSWORD" -a -z "$MYSQL_ALLOW_EMPTY_PASSWORD" -a -z "$MYSQL_RANDOM_ROOT_PASSWORD" ]; then
-		echo >&2 'error: database is uninitialized and password option is not specified '
-		echo >&2 '  You need to specify one of MYSQL_ROOT_PASSWORD, MYSQL_ALLOW_EMPTY_PASSWORD and MYSQL_RANDOM_ROOT_PASSWORD'
+		echo >&2 'error: You need to specify one of MYSQL_ROOT_PASSWORD, MYSQL_ALLOW_EMPTY_PASSWORD and MYSQL_RANDOM_ROOT_PASSWORD'
 		exit 1
 	fi
 	mkdir -p "$DATADIR"
@@ -51,24 +51,25 @@ _initialize_database() {
 	mysql_tzinfo_to_sql /usr/share/zoneinfo | sed 's/Local time zone must be set--see zic manual page/FCTY/' | "${mysql[@]}" mysql
 
 	"${mysql[@]}" <<-EOSQL
-		-- What's done in this file shouldn't be replicated
-		--  or products like mysql-fabric won't work
 		SET @@SESSION.SQL_LOG_BIN=0;
 		CREATE USER 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
 		GRANT ALL ON *.* TO 'root'@'%' WITH GRANT OPTION ;
 		ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+
 		CREATE USER 'xtrabackup'@'localhost' IDENTIFIED BY '$XTRABACKUP_PASSWORD';
 		GRANT RELOAD,PROCESS,LOCK TABLES,REPLICATION CLIENT ON *.* TO 'xtrabackup'@'localhost';
 		FLUSH PRIVILEGES;
+
+		CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\` ;
 	EOSQL
 	mysql+=( -p"${MYSQL_ROOT_PASSWORD}" )
-
-	echo "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\` ;" | "${mysql[@]}"
 	mysql+=( "$MYSQL_DATABASE" )
 
-	echo "CREATE USER '"$MYSQL_USER"'@'%' IDENTIFIED BY '"$MYSQL_PASSWORD"' ;" | "${mysql[@]}"
-	echo "GRANT ALL ON \`"$MYSQL_DATABASE"\`.* TO '"$MYSQL_USER"'@'%' ;" | "${mysql[@]}"
-	echo 'FLUSH PRIVILEGES ;' | "${mysql[@]}"
+	"${mysql[@]}" <<-EOSQL
+		CREATE USER '"$MYSQL_USER"'@'%' IDENTIFIED BY '"$MYSQL_PASSWORD"' ;
+		GRANT ALL ON \`"$MYSQL_DATABASE"\`.* TO '"$MYSQL_USER"'@'%' ;
+		FLUSH PRIVILEGES;
+	EOSQL
 
 	if ! kill -s TERM "$pid" || ! wait "$pid"; then
 		echo >&2 'MySQL init process failed.'
@@ -77,9 +78,6 @@ _initialize_database() {
 }
 
 _recover_backup() {
-	echo
-	echo -n 'Recovering Backup...'
-
 	curl "$BACKUP_URL" -# -o /tmp/mysql_backup.tar
 
 	tar -xf /tmp/mysql_backup.tar -C /tmp
@@ -101,21 +99,24 @@ _recover_backup() {
 		FLUSH PRIVILEGES;
 	EOSQL
 
-	echo 'Done'
-	echo
-
 	CLUSTER_JOIN=""
 	INITARG=--init-file=/tmp/init.sql
 }
 
 if [ ! -e "$DATADIR/mysql" ]; then
+	echo "Initialize database..."
 	_initialize_database
+	echo "Finished!"
+	echo
 
 	if [ ! -z "$BACKUP_URL" ]; then
+		echo "Revocer database..."
 		_recover_backup
+		echo "Finished!"
+		echo
 	fi
 
-	echo 'MySQL init process done.'
+	echo 'MySQL is initialized!'
 fi
 
 chown -R mysql:mysql "$DATADIR"
