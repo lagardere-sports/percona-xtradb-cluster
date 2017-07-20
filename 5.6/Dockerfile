@@ -1,11 +1,14 @@
-# vim:set ft=dockerfile:
 FROM percona/percona-xtradb-cluster:5.6.36
 
-# Install dumb-init
+# cleanup
+RUN rm -f \
+      /usr/bin/clustercheckcron \
+      /percona-release_0.1-4.jessie_all.deb \
+      /entrypoint.sh
+
+# dumb-init
 RUN wget -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64
 RUN chmod +x /usr/local/bin/dumb-init
-
-RUN rm -f /usr/bin/clustercheckcron
 
 COPY readiness_probe.sh /usr/local/bin/
 
