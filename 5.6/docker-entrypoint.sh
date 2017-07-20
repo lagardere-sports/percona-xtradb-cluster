@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/local/bin/dumb-init /bin/bash
 set -e
 
 # if command starts with an option, prepend mysqld
@@ -6,15 +6,19 @@ if [ "${1:0:1}" = '-' ]; then
 	set -- mysqld "$@"
 fi
 
+if [ "$1" != 'mysqld' ]; then
+	exec "$@"
+	exit $?
+fi
+
 if [ -z "$CLUSTER_NAME" ]; then
 	echo >&2 'Error:  You need to specify CLUSTER_NAME'
 	exit 1
 fi
 
-# Get config
 DATADIR="$($@ --verbose --wsrep_on=OFF --help 2>/dev/null | awk '$1 == "datadir" { print $2; exit }')"
 
-if [ ! -e "$DATADIR/mysql" ]; then
+_initialize_database() {
 	if [ -z "$MYSQL_ROOT_PASSWORD" -a -z "$MYSQL_ALLOW_EMPTY_PASSWORD" -a -z "$MYSQL_RANDOM_ROOT_PASSWORD" ]; then
 		echo >&2 'error: database is uninitialized and password option is not specified '
 		echo >&2 '  You need to specify one of MYSQL_ROOT_PASSWORD, MYSQL_ALLOW_EMPTY_PASSWORD and MYSQL_RANDOM_ROOT_PASSWORD'
@@ -70,13 +74,9 @@ if [ ! -e "$DATADIR/mysql" ]; then
 		echo >&2 'MySQL init process failed.'
 		exit 1
 	fi
+}
 
-	echo
-	echo 'MySQL init process done.'
-	echo
-fi
-
-if [ ! -z "$BACKUP_URL" ]; then
+_recover_backup() {
 	echo
 	echo -n 'Recovering Backup...'
 
@@ -106,9 +106,17 @@ if [ ! -z "$BACKUP_URL" ]; then
 
 	CLUSTER_JOIN=""
 	INITARG=--init-file=/tmp/init.sql
+}
+
+if [ ! -e "$DATADIR/mysql" ]; then
+	_initialize_database
+
+	if [ ! -z "$BACKUP_URL" ]; then
+		_recover_backup
+	fi
+
+	echo 'MySQL init process done.'
 fi
 
 chown -R mysql:mysql "$DATADIR"
-
-echo "Ready for startup..."
 exec "$@" --user=mysql --wsrep_cluster_name=$CLUSTER_NAME --wsrep_cluster_address="gcomm://$CLUSTER_JOIN" --wsrep_sst_method=xtrabackup-v2 --wsrep_sst_auth="xtrabackup:$XTRABACKUP_PASSWORD" --wsrep_node_address="$ipaddr" $INITARG
