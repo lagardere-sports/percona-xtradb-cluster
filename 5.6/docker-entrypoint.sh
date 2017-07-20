@@ -55,9 +55,6 @@ if [ ! -e "$DATADIR/mysql" ]; then
 		ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
 		CREATE USER 'xtrabackup'@'localhost' IDENTIFIED BY '$XTRABACKUP_PASSWORD';
 		GRANT RELOAD,PROCESS,LOCK TABLES,REPLICATION CLIENT ON *.* TO 'xtrabackup'@'localhost';
-		GRANT REPLICATION CLIENT ON *.* TO monitor@'%' IDENTIFIED BY 'monitor';
-		GRANT PROCESS ON *.* TO monitor@localhost IDENTIFIED BY 'monitor';
-		DROP DATABASE IF EXISTS test ;
 		FLUSH PRIVILEGES;
 	EOSQL
 	mysql+=( -p"${MYSQL_ROOT_PASSWORD}" )
