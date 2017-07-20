@@ -6,4 +6,4 @@ WSREP_STATUS=($(
   tr '\n' ' '
 ))
 
-exec test ${WSREP_STATUS[0]} = 'Synced' && ${WSREP_STATUS[1]} = 'ON' && ${WSREP_STATUS[2]} = 'ON'
+exec test ${WSREP_STATUS[0]} = 'Synced' -a ${WSREP_STATUS[1]} = 'ON' -a ${WSREP_STATUS[2]} = 'ON'
