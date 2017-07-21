@@ -68,6 +68,18 @@ _exec_entrypoints() {
 	done
 }
 
+_check_config() {
+	toRun=( "$@" --wsrep-recover --verbose --help --log-bin-index="$(mktemp -u)" )
+	if ! errors="$("${toRun[@]}" 2>&1 >/dev/null)"; then
+		cat >&2 <<-EOM
+			ERROR: mysqld failed while attempting to check config
+			command was: "${toRun[*]}"
+			$errors
+		EOM
+		exit 1
+	fi
+}
+
 # if command starts with an option, prepend mysqld
 if [ "${1:0:1}" = '-' ]; then
 	set -- mysqld "$@"
@@ -79,7 +91,9 @@ if [ "$1" = 'mysqld' ]; then
 		exit 1
 	fi
 
-	DATADIR="$($@ --verbose --wsrep_on=OFF --help 2>/dev/null | awk '$1 == "datadir" { print $2; exit }')"
+	_check_config "$@"
+
+	DATADIR="$($@ --wsrep-recover --verbose --help 2>/dev/null | awk '$1 == "datadir" { print $2; exit }')"
 
 	if [ ! -e "$DATADIR/mysql" ]; then
 		echo "Initializing database..."
