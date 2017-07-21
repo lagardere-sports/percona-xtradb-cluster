@@ -56,7 +56,7 @@ _initialize_database() {
 
 _exec_entrypoints() {
 	mysql=( mysql --protocol=socket -uroot -p$MYSQL_ROOT_PASSWORD )
-	
+
 	for f in /docker-entrypoint-initdb.d/*; do
 		case "$f" in
 			*.sh)     echo "$0: running $f"; . "$f" ;;
@@ -99,7 +99,6 @@ if [ "$1" = 'mysqld' ]; then
 		--wsrep_cluster_address="gcomm://$CLUSTER_JOIN"
 		--wsrep_sst_method=xtrabackup-v2
 		--wsrep_sst_auth="xtrabackup:$XTRABACKUP_PASSWORD"
-		--wsrep_node_address="$NODE_ADDRESS"
 	)
 fi
 
