@@ -1,7 +1,7 @@
 # About this Repo
-[![Docker Badge](http://dockeri.co/image/pgolm/percona-xtradb-cluster)](https://hub.docker.com/r/pgolm/percona-xtradb-cluster)
 
 [![Build Status](https://travis-ci.org/pgolm/percona-xtradb-cluster.svg?branch=master)](https://travis-ci.org/pgolm/percona-xtradb-cluster)
+[![Docker Pull Badge](https://img.shields.io/docker/pulls/pgolm/percona-xtradb-cluster.svg)](https://hub.docker.com/r/pgolm/percona-xtradb-cluster)
 
 This is the git repo of the docker image of percona-xtradb-cluster. It's based on [original image](https://hub.docker.com/r/percona/percona-xtradb-cluster/) and is inspired by [community image](https://hub.docker.com/_/percona/).
 
