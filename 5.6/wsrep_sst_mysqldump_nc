@@ -1,0 +1,66 @@
+#!/bin/bash -ue
+
+. $(dirname $0)/wsrep_sst_common
+
+REMOTEIP=$WSREP_SST_OPT_ADDR
+REMOTEPORT=4444
+
+# Refs https://github.com/codership/mysql-wsrep/issues/141
+# Passing password in MYSQL_PWD environment variable is considered
+# "extremely insecure" by MySQL Guidelines for Password Security
+# the whole command line is easily observable by any unprivileged user via ps,
+# whereas (at least on Linux) unprivileged user can't see process environment
+# that he does not own. So while it may be not secure in the NSA sense of the
+# word, it is arguably more secure than passing password on the command line.
+export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+[ -n "${SST_PROGRESS_FILE:-}" ] && touch $SST_PROGRESS_FILE
+
+STOP_WSREP="SET wsrep_on=OFF;"
+
+# NOTE: we don't use --routines here because we're dumping mysql.proc table
+MYSQLDUMP="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
+-uroot -S$WSREP_SST_OPT_SOCKET \
+--add-drop-database --add-drop-table --skip-add-locks --create-options \
+--disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
+--skip-comments --flush-privileges --all-databases --events"
+
+# mysqldump cannot restore CSV tables, fix this issue
+CSV_TABLES_FIX="
+set sql_mode='';
+
+USE mysql;
+
+SET @str = IF (@@have_csv = 'YES', 'CREATE TABLE IF NOT EXISTS general_log (event_time TIMESTAMP NOT NULL, user_host MEDIUMTEXT NOT NULL, thread_id INTEGER NOT NULL, server_id INTEGER UNSIGNED NOT NULL, command_type VARCHAR(64) NOT NULL,argument MEDIUMTEXT NOT NULL) engine=CSV CHARACTER SET utf8 comment=\"General log\"', 'SET @dummy = 0');
+
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @str = IF (@@have_csv = 'YES', 'CREATE TABLE IF NOT EXISTS slow_log (start_time TIMESTAMP NOT NULL, user_host MEDIUMTEXT NOT NULL, query_time TIME NOT NULL, lock_time TIME NOT NULL, rows_sent INTEGER NOT NULL, rows_examined INTEGER NOT NULL, db VARCHAR(512) NOT NULL, last_insert_id INTEGER NOT NULL, insert_id INTEGER NOT NULL, server_id INTEGER UNSIGNED NOT NULL, sql_text MEDIUMTEXT NOT NULL) engine=CSV CHARACTER SET utf8 comment=\"Slow log\"', 'SET @dummy = 0');
+
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;"
+
+SET_START_POSITION="SET GLOBAL wsrep_start_position='$WSREP_SST_OPT_GTID';"
+
+
+# tcmd="nc ${REMOTEIP} ${REMOTEPORT}"
+tcmd="socat -u stdio TCP:${REMOTEIP}:${REMOTEPORT}"
+    
+echo $STOP_WSREP
+
+wsrep_log_info "Dumping data"
+$MYSQLDUMP > /tmp/backup.sql 
+
+wsrep_log_info "Sending dump"
+cat /tmp/backup.sql | $tcmd
+
+wsrep_log_info "Deleting dump"
+rm /tmp/backup.sql
+
+wsrep_log_info "Done"
+
+echo $SET_START_POSITION
+
+wsrep_cleanup_progress_file

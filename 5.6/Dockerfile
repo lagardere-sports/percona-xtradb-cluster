@@ -12,6 +12,9 @@ RUN chmod +x /usr/local/bin/dumb-init
 
 COPY readiness_probe.sh /usr/local/bin/
 
+COPY wsrep_sst_mysqldump_nc /usr/bin/
+RUN chmod a+x /usr/bin/wsrep_sst_mysqldump_nc
+
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
 
