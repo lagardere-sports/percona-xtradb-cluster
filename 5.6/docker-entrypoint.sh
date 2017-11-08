@@ -48,6 +48,10 @@ _initialize_database() {
 		FLUSH PRIVILEGES;
 	EOSQL
 
+	if [ ! -z "$MYSQL_ROOT_PASSWORD" ]; then
+		mysql+=( -p"${MYSQL_ROOT_PASSWORD}" )
+	fi
+
 	if [ "$MYSQL_DATABASE" ]; then
 		echo "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\` ;" | "${mysql[@]}"
 		mysql+=( "$MYSQL_DATABASE" )
