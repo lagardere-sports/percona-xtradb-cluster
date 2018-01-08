@@ -67,6 +67,8 @@ _initialize_database() {
 		echo 'FLUSH PRIVILEGES ;' | "${mysql[@]}"
 	fi
 
+	_exec_entrypoints "$@"
+
 	if ! kill -s TERM "$pid" || ! wait "$pid"; then
 		echo >&2 'MySQL init process failed.'
 		exit 1
@@ -117,7 +119,6 @@ if [ "$1" = 'mysqld' ]; then
 	if [ ! -e "$DATADIR/mysql" ]; then
 		echo "Initializing database..."
 		_initialize_database "$@"
-		_exec_entrypoints "$@"
 
 		echo
 		echo 'Database is initialized!'
